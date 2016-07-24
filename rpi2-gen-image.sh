@@ -48,7 +48,7 @@ UBOOT_CONFIG=${UBOOT_CONFIG:=rpi_2_defconfig}
 QEMU_BINARY=${QEMU_BINARY:=/usr/bin/qemu-arm-static}
 
 # Build directories
-BASEDIR="$(pwd)/images/${RELEASE}"
+BASEDIR=${BASEDIR:=$(pwd)/images/${RELEASE}}
 BUILDDIR="${BASEDIR}/build"
 
 # Chroot directories
