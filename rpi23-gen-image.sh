@@ -63,6 +63,7 @@ UBOOT_URL=${UBOOT_URL:=git://git.denx.de/u-boot.git}
 # Build directories
 BASEDIR=${BASEDIR:=$(pwd)/images/${RELEASE}}
 BUILDDIR="${BASEDIR}/build"
+CHROOT_SOURCE=${CHROOT_SOURCE:=""}
 
 # Chroot directories
 R="${BUILDDIR}/chroot"
