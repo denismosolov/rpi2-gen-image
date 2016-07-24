@@ -50,6 +50,7 @@ QEMU_BINARY=${QEMU_BINARY:=/usr/bin/qemu-arm-static}
 # Build directories
 BASEDIR=${BASEDIR:=$(pwd)/images/${RELEASE}}
 BUILDDIR="${BASEDIR}/build"
+CHROOT_SOURCE=${CHROOT_SOURCE:=""}
 
 # Chroot directories
 R="${BUILDDIR}/chroot"
