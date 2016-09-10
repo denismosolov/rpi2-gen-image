@@ -38,7 +38,7 @@ if [ "$CHROOT_SOURCE" = "" ] ; then
   # Complete the bootstrapping process
   chroot_exec /debootstrap/debootstrap --second-stage
 else
-  sudo cp -r "$CHROOT_SOURCE"/* "${R}"/
+  cp -r "$CHROOT_SOURCE"/* "${R}"/
 fi
 
 # Mount required filesystems
