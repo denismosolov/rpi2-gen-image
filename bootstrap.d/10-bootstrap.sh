@@ -39,6 +39,7 @@ if [ "$CHROOT_SOURCE" = "" ] ; then
   chroot_exec /debootstrap/debootstrap --second-stage
 else
   cp -r "$CHROOT_SOURCE"/* "${R}"/
+  chroot "${R}"/ apt-get install `echo $APT_INCLUDE | sed 's/,/ /g'`
 fi
 
 # Mount required filesystems
