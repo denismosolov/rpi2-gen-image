@@ -39,6 +39,7 @@ if [ "$CHROOT_SOURCE" = "" ] ; then
   chroot_exec /debootstrap/debootstrap --second-stage
 else
   cp -r "$CHROOT_SOURCE"/* "${R}"/
+  chroot "${R}" bash -c 'echo nameserver 8.8.4.4 > /etc/resolv.conf'
   chroot "${R}"/ apt-get update
   chroot "${R}"/ apt-get install -y `echo $APT_INCLUDES | sed 's/,/ /g'`
 fi
