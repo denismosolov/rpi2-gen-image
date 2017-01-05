@@ -1,6 +1,6 @@
 # rpi23-gen-image
 ## Introduction
-`rpi23-gen-image.sh` is an advanced Debian Linux bootstrapping shell script for generating Debian OS images for Raspberry Pi 2 (RPi2) and Raspberry Pi 3 (RPi3) computers. The script at this time supports the bootstrapping of the Debian releases `jessie` and `stretch`. Raspberry Pi 3 images are currently generated for 32-bit mode only.
+`rpi23-gen-image.sh` is an advanced Debian Linux bootstrapping shell script for generating Debian OS images for Raspberry Pi 2 (RPi2) and Raspberry Pi 3 (RPi3) computers. The script at this time supports the bootstrapping of the Debian (armhf) releases `jessie` and `stretch`. Raspberry Pi 3 images are currently generated for 32-bit mode only.
 
 ## Build dependencies
 The following list of Debian packages must be installed on the build system because they are essentially required for the bootstrapping process. The script will check if all required packages are installed and missing packages will be installed automatically if confirmed by the user.
@@ -164,7 +164,7 @@ Create non-root user with password raspberry. Unless overridden with `USER_NAME`
 ##### `USER_NAME`=pi
 Non-root user to create.  Ignored if `ENABLE_USER`=false
 
-##### `ENABLE_ROOT`=true
+##### `ENABLE_ROOT`=false
 Set root user password so root login will be enabled
 
 ##### `ENABLE_ROOT_SSH`=true
@@ -214,8 +214,11 @@ Clean the existing kernel sources directory `KERNELSRC_DIR` (using `make mrprope
 ##### `KERNELSRC_CONFIG`=true
 Run `make bcm2709_defconfig` (and optional `make menuconfig`) to configure the kernel sources before building. This parameter is automatically set to `true` if no existing kernel sources directory was specified using `KERNELSRC_DIR`. This parameter is ignored if `KERNELSRC_PREBUILT`=true.
 
+##### `KERNELSRC_USRCONFIG`=""
+Copy own config file to kernel `.config`. If `KERNEL_MENUCONFIG`=true then running after copy.
+
 ##### `KERNELSRC_PREBUILT`=false
-With this parameter set to true the script expects the existing kernel sources directory to be already successfully cross-compiled. The parameters `KERNELSRC_CLEAN`, `KERNELSRC_CONFIG` and `KERNEL_MENUCONFIG` are ignored and no kernel compilation tasks are performed.
+With this parameter set to true the script expects the existing kernel sources directory to be already successfully cross-compiled. The parameters `KERNELSRC_CLEAN`, `KERNELSRC_CONFIG`, `KERNELSRC_USRCONFIG` and `KERNEL_MENUCONFIG` are ignored and no kernel compilation tasks are performed.
 
 ##### `RPI_FIRMWARE_DIR`=""
 The directory containing a local copy of the firmware from the [RaspberryPi firmware project](https://github.com/raspberrypi/firmware). Default is to download the latest firmware directly from the project.
