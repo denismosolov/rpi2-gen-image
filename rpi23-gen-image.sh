@@ -1,7 +1,7 @@
 #!/bin/sh
 
 ########################################################################
-# rpi23-gen-image.sh					       2015-2016
+# rpi23-gen-image.sh					       2015-2017
 #
 # Advanced Debian "jessie" and "stretch"  bootstrap script for RPi2/3
 #
@@ -29,6 +29,11 @@ fi
 
 # Load utility functions
 . ./functions.sh
+
+# Load parameters from configuration template file
+if [ ! -z "$CONFIG_TEMPLATE" ] ; then
+  use_template
+fi
 
 # Introduce settings
 set -e
@@ -84,7 +89,7 @@ RPI_FIRMWARE_DIR=${RPI_FIRMWARE_DIR:=""}
 # General settings
 HOSTNAME=${HOSTNAME:=rpi${RPI_MODEL}-${RELEASE}}
 PASSWORD=${PASSWORD:=raspberry}
-USER_PASSWORD=${USER_PASSWORD:=${PASSWORD}}
+USER_PASSWORD=${USER_PASSWORD:=raspberry}
 DEFLOCAL=${DEFLOCAL:="en_US.UTF-8"}
 TIMEZONE=${TIMEZONE:="Europe/Berlin"}
 EXPANDROOT=${EXPANDROOT:=true}
@@ -113,6 +118,8 @@ APT_SERVER=${APT_SERVER:="ftp.debian.org"}
 
 # Feature settings
 ENABLE_CONSOLE=${ENABLE_CONSOLE:=true}
+ENABLE_I2C=${ENABLE_I2C:=false}
+ENABLE_SPI=${ENABLE_SPI:=false}
 ENABLE_IPV6=${ENABLE_IPV6:=true}
 ENABLE_SSHD=${ENABLE_SSHD:=true}
 ENABLE_NONFREE=${ENABLE_NONFREE:=false}
@@ -127,7 +134,13 @@ ENABLE_RSYSLOG=${ENABLE_RSYSLOG:=true}
 ENABLE_USER=${ENABLE_USER:=true}
 USER_NAME=${USER_NAME:="pi"}
 ENABLE_ROOT=${ENABLE_ROOT:=false}
-ENABLE_ROOT_SSH=${ENABLE_ROOT_SSH:=false}
+
+# SSH settings
+SSH_ENABLE_ROOT=${SSH_ENABLE_ROOT:=false}
+SSH_DISABLE_PASSWORD_AUTH=${SSH_DISABLE_PASSWORD_AUTH:=false}
+SSH_LIMIT_USERS=${SSH_LIMIT_USERS:=false}
+SSH_ROOT_PUB_KEY=${SSH_ROOT_PUB_KEY:=""}
+SSH_USER_PUB_KEY=${SSH_USER_PUB_KEY:=""}
 
 # Advanced settings
 ENABLE_MINBASE=${ENABLE_MINBASE:=false}
@@ -139,6 +152,7 @@ ENABLE_IPTABLES=${ENABLE_IPTABLES:=false}
 ENABLE_SPLITFS=${ENABLE_SPLITFS:=false}
 ENABLE_INITRAMFS=${ENABLE_INITRAMFS:=false}
 ENABLE_IFNAMES=${ENABLE_IFNAMES:=true}
+DISABLE_UNDERVOLT_WARNINGS=${DISABLE_UNDERVOLT_WARNINGS:=}
 
 # Kernel compilation settings
 BUILD_KERNEL=${BUILD_KERNEL:=false}
@@ -182,7 +196,7 @@ APT_INCLUDES=${APT_INCLUDES:=""}
 APT_INCLUDES="${APT_INCLUDES},apt-transport-https,apt-utils,ca-certificates,debian-archive-keyring,dialog,sudo,systemd,sysvinit-utils"
 
 # Packages required for bootstrapping
-REQUIRED_PACKAGES="debootstrap debian-archive-keyring qemu-user-static binfmt-support dosfstools rsync bmap-tools whois git bc"
+REQUIRED_PACKAGES="debootstrap debian-archive-keyring qemu-user-static binfmt-support dosfstools rsync bmap-tools whois git bc psmisc dbus"
 MISSING_PACKAGES=""
 
 set +x
@@ -204,6 +218,14 @@ fi
 if [ "$ENABLE_WIRELESS" = true ] && [ "$RPI_MODEL" != 3 ] ; then
   echo "error: The selected Raspberry Pi model has no internal wireless interface"
   exit 1
+fi
+
+# Check if DISABLE_UNDERVOLT_WARNINGS parameter value is supported
+if [ ! -z "$DISABLE_UNDERVOLT_WARNINGS" ] ; then
+  if [ "$DISABLE_UNDERVOLT_WARNINGS" != 1 ] && [ "$DISABLE_UNDERVOLT_WARNINGS" != 2 ] ; then
+    echo "error: DISABLE_UNDERVOLT_WARNINGS=${DISABLE_UNDERVOLT_WARNINGS} is not supported"
+    exit 1
+  fi
 fi
 
 # Set compiler packages and build RPi2/3 Linux kernel if required by Debian release
@@ -247,6 +269,27 @@ fi
 # Add initramfs generation tools
 if [ "$ENABLE_INITRAMFS" = true ] && [ "$BUILD_KERNEL" = true ] ; then
   APT_INCLUDES="${APT_INCLUDES},initramfs-tools"
+fi
+
+# Add device-tree-compiler required for building the U-Boot bootloader
+if [ "$ENABLE_UBOOT" = true ] ; then
+  APT_INCLUDES="${APT_INCLUDES},device-tree-compiler"
+fi
+
+# Check if root SSH (v2) public key file exists
+if [ ! -z "$SSH_ROOT_PUB_KEY" ] ; then
+  if [ ! -f "$SSH_ROOT_PUB_KEY" ] ; then
+    echo "error: '$SSH_ROOT_PUB_KEY' specified SSH public key file not found (SSH_ROOT_PUB_KEY)!"
+    exit 1
+  fi
+fi
+
+# Check if $USER_NAME SSH (v2) public key file exists
+if [ ! -z "$SSH_USER_PUB_KEY" ] ; then
+  if [ ! -f "$SSH_USER_PUB_KEY" ] ; then
+    echo "error: '$SSH_USER_PUB_KEY' specified SSH public key file not found (SSH_USER_PUB_KEY)!"
+    exit 1
+  fi
 fi
 
 # Check if all required packages are installed on the build system
@@ -479,6 +522,9 @@ ROOT_SECTORS=$(expr $(expr ${CHROOT_SIZE} + ${CHROOT_SIZE} \/ 100 \* 25) \* 1024
 
 # Calculate required image size in 512 Byte sectors
 IMAGE_SECTORS=$(expr ${TABLE_SECTORS} + ${FRMW_SECTORS} + ${ROOT_SECTORS})
+
+# Prepare date string for image file name
+DATE="$(date +%Y-%m-%d)"
 
 # Prepare image file
 if [ "$ENABLE_SPLITFS" = true ] ; then

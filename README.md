@@ -5,7 +5,20 @@
 ## Build dependencies
 The following list of Debian packages must be installed on the build system because they are essentially required for the bootstrapping process. The script will check if all required packages are installed and missing packages will be installed automatically if confirmed by the user.
 
-  ```debootstrap debian-archive-keyring qemu-user-static binfmt-support dosfstools rsync bmap-tools whois git```
+  ```debootstrap debian-archive-keyring qemu-user-static binfmt-support dosfstools rsync bmap-tools whois git bc psmisc dbus```
+
+It is recommended to configure the `rpi23-gen-image.sh` script to build and install the latest Raspberry Pi Linux kernel. For the RPi3 this is mandetory. Kernel compilation and linking will be performed on the build system using an ARM (armhf) cross-compiler toolchain.
+
+The script has been tested using the default `crossbuild-essential-armhf` toolchain meta package on Debian Linux `jessie` and `stretch` build systems. Please check the [Debian CrossToolchains Wiki](https://wiki.debian.org/CrossToolchains) for further information.
+
+If a Debian Linux `jessie` build system is used it will be required to add the [Debian Cross-toolchains repository](http://emdebian.org/tools/debian/) first:
+
+```
+echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.list.d/crosstools.list
+sudo -u nobody wget -O - http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add -
+dpkg --add-architecture armhf
+apt-get update
+```
 
 ## Command-line parameters
 The script accepts certain command-line parameters to enable or disable specific OS features, services and configuration settings. These parameters are passed to the `rpi23-gen-image.sh` script via (simple) shell-variables. Unlike environment shell-variables (simple) shell-variables are defined at the beginning of the command-line call of the `rpi23-gen-image.sh` script.
@@ -27,6 +40,16 @@ RPI_MODEL=3 ENABLE_WIRELESS=true ENABLE_MINBASE=true BUILD_KERNEL=true ./rpi23-g
 RELEASE=stretch RPI_MODEL=3 ENABLE_WIRELESS=true ENABLE_MINBASE=true BUILD_KERNEL=true ./rpi23-gen-image.sh
 ```
 
+## Configuration template files
+To avoid long lists of command-line parameters and to help to store the favourite parameter configurations the `rpi23-gen-image.sh` script supports so called configuration template files (`CONFIG_TEMPLATE`=template). These are simple text files located in the `./templates` directory that contain the list of configuration parameters that will be used. New configuration template files can be added to the `./templates` directory.
+
+#####Command-line examples:
+```shell
+CONFIG_TEMPLATE=rpi3stretch ./rpi23-gen-image.sh
+CONFIG_TEMPLATE=rpi2stretch ./rpi23-gen-image.sh
+```
+
+## Supported parameters and settings
 #### APT settings:
 ##### `APT_SERVER`="ftp.debian.org"
 Set Debian packages server address. Choose a server from the list of Debian worldwide [mirror sites](https://www.debian.org/mirror/list). Using a nearby server will probably speed-up all required downloads within the bootstrapping process.
@@ -36,6 +59,8 @@ Set Proxy server address. Using a local Proxy-Cache like `apt-cacher-ng` will sp
 
 ##### `APT_INCLUDES`=""
 A comma separated list of additional packages to be installed during bootstrapping.
+
+---
 
 #### General system settings:
 ##### `RPI_MODEL`=2
@@ -48,7 +73,10 @@ Set the desired Debian release name. The script at this time supports the bootst
 Set system host name. It's recommended that the host name is unique in the corresponding subnet.
 
 ##### `PASSWORD`="raspberry"
-Set system `root` password. The same password is used for the created user `pi`. It's **STRONGLY** recommended that you choose a custom password.
+Set system `root` password. It's **STRONGLY** recommended that you choose a custom password.
+
+##### `USER_PASSWORD`="raspberry"
+Set password for the created non-root user `USER_NAME`=pi. Ignored if `ENABLE_USER`=false. It's **STRONGLY** recommended that you choose a custom password.
 
 ##### `DEFLOCAL`="en_US.UTF-8"
 Set default system locale. This setting can also be changed inside the running OS using the `dpkg-reconfigure locales` command. Please note that on using this parameter the script will automatically install the required packages `locales`, `keyboard-configuration` and `console-setup`.
@@ -58,6 +86,8 @@ Set default system timezone. All available timezones can be found in the `/usr/s
 
 ##### `EXPANDROOT`=true
 Expand the root partition and filesystem automatically on first boot.
+
+---
 
 #### Keyboard settings:
 These options are used to configure keyboard layout in `/etc/default/keyboard` for console and Xorg. These settings can also be changed inside the running OS using the `dpkg-reconfigure keyboard-configuration` command.
@@ -74,11 +104,15 @@ Set the supported variant(s) of the keyboard layout(s).
 ##### `XKB_OPTIONS`=""
 Set extra xkb configuration options.
 
+---
+
 #### Networking settings (DHCP):
 This parameter is used to set up networking auto configuration in `/etc/systemd/network/eth.network`. The default location of network configuration files in the Debian `stretch` release was changed to `/lib/systemd/network`.`
 
 #####`ENABLE_DHCP`=true
 Set the system to use DHCP. This requires an DHCP server.
+
+---
 
 #### Networking settings (static):
 These parameters are used to set up a static networking configuration in `/etc/systemd/network/eth.network`. The following static networking parameters are only supported if `ENABLE_DHCP` was set to `false`. The default location of network configuration files in the Debian `stretch` release was changed to `/lib/systemd/network`.
@@ -104,9 +138,17 @@ Set the IP address for the first NTP server.
 #####`NET_NTP_2`=""
 Set the IP address for the second NTP server.
 
+---
+
 #### Basic system features:
 ##### `ENABLE_CONSOLE`=true
 Enable serial console interface. Recommended if no monitor or keyboard is connected to the RPi2/3. In case of problems fe. if the network (auto) configuration failed - the serial console can be used to access the system.
+
+##### `ENABLE_I2C`=false
+Enable I2C interface on the RPi2/3. Please check the [RPi2/3 pinout diagrams](http://elinux.org/RPi_Low-level_peripherals) to connect the right GPIO pins.
+
+##### `ENABLE_SPI`=false
+Enable SPI interface on the RPi2/3. Please check the [RPi2/3 pinout diagrams](http://elinux.org/RPi_Low-level_peripherals) to connect the right GPIO pins.
 
 ##### `ENABLE_IPV6`=true
 Enable IPv6 support. The network interface configuration is managed via systemd-networkd.
@@ -142,6 +184,8 @@ Install Xorg open-source X Window System.
 ##### `ENABLE_WM`=""
 Install a user defined window manager for the X Window System. To make sure all X related package dependencies are getting installed `ENABLE_XORG` will automatically get enabled if `ENABLE_WM` is used. The `rpi23-gen-image.sh` script has been tested with the following list of window managers: `blackbox`, `openbox`, `fluxbox`, `jwm`, `dwm`, `xfce4`, `awesome`.
 
+---
+
 #### Advanced system features:
 ##### `ENABLE_MINBASE`=false
 Use debootstrap script variant `minbase` which only includes essential packages and apt. This will reduce the disk usage by about 65 MB.
@@ -159,17 +203,13 @@ Install and enable the [hardware accelerated Xorg video driver](https://github.c
 Enable iptables IPv4/IPv6 firewall. Simplified ruleset: Allow all outgoing connections. Block all incoming connections except to OpenSSH service.
 
 ##### `ENABLE_USER`=true
-Create non-root user with password raspberry. Unless overridden with `USER_NAME`=user, username will be `pi`.
+Create non-root user with password `USER_PASSWORD`=raspberry. Unless overridden with `USER_NAME`=user, username will be `pi`.
 
 ##### `USER_NAME`=pi
 Non-root user to create.  Ignored if `ENABLE_USER`=false
 
 ##### `ENABLE_ROOT`=false
 Set root user password so root login will be enabled
-
-##### `ENABLE_ROOT_SSH`=true
-Enable password root login via SSH. May be a security risk with default
-password, use only in trusted environments.
 
 ##### `ENABLE_HARDNET`=false
 Enable IPv4/IPv6 network stack hardening settings.
@@ -185,6 +225,29 @@ Create an initramfs that that will be loaded during the Linux startup process. `
 
 ##### `ENABLE_IFNAMES`=true
 Enable automatic assignment of predictable, stable network interface names for all local Ethernet, WLAN interfaces. This might create complex and long interface names. This parameter is only supported if the Debian release `stretch` is used.
+
+##### `DISABLE_UNDERVOLT_WARNINGS`=
+Disable RPi2/3 under-voltage warnings and overlays. Setting the parameter to `1` will disable the warning overlay. Setting it to `2` will additionally allow RPi2/3 turbo mode when low-voltage is present.
+
+---
+
+#### SSH settings:
+##### `SSH_ENABLE_ROOT`=false
+Enable password root login via SSH. This may be a security risk with default password, use only in trusted environments. `ENABLE_ROOT` must be set to `true`.
+
+##### `SSH_DISABLE_PASSWORD_AUTH`=false
+Disable password based SSH authentication. Only public key based SSH (v2) authentication will be supported.
+
+##### `SSH_LIMIT_USERS`=false
+Limit the users that are allowed to login via SSH. Only allow user `USER_NAME`=pi and root if `SSH_ENABLE_ROOT`=true to login.
+
+##### `SSH_ROOT_PUB_KEY`=""
+Add SSH (v2) public key(s) from specified file to `authorized_keys` file to enable public key based SSH (v2) authentication of user `root`. The specified file can also contain multiple SSH (v2) public keys. SSH protocol version 1 is not supported. `ENABLE_ROOT` **and** `SSH_ENABLE_ROOT` must be set to `true`.
+
+##### `SSH_USER_PUB_KEY`=""
+Add SSH (v2) public key(s) from specified file to `authorized_keys` file to enable public key based SSH (v2) authentication of user `USER_NAME`=pi. The specified file can also contain multiple SSH (v2) public keys. SSH protocol version 1 is not supported.
+
+---
 
 #### Kernel compilation:
 ##### `BUILD_KERNEL`=false
@@ -223,6 +286,8 @@ With this parameter set to true the script expects the existing kernel sources d
 ##### `RPI_FIRMWARE_DIR`=""
 The directory containing a local copy of the firmware from the [RaspberryPi firmware project](https://github.com/raspberrypi/firmware). Default is to download the latest firmware directly from the project.
 
+---
+
 #### Reduce disk usage:
 The following list of parameters is ignored if `ENABLE_REDUCE`=false.
 
@@ -250,8 +315,9 @@ Replace `openssh-server` with `dropbear`.
 ##### `REDUCE_LOCALE`=true
 Remove all `locale` translation files.
 
-#### Encrypted root partition:
+---
 
+#### Encrypted root partition:
 ##### `ENABLE_CRYPTFS`=false
 Enable full system encryption with dm-crypt. Setup a fully LUKS encrypted root partition (aes-xts-plain64:sha512) and generate required initramfs. The /boot directory will not be encrypted. This parameter will be ignored if `BUILD_KERNEL`=false. `ENABLE_CRYPTFS` is experimental. SSH-to-initramfs is currently not supported but will be soon - feel free to help.
 
@@ -276,10 +342,12 @@ The functions of this script that are required for the different stages of the b
 | `11-apt.sh` | Setup APT repositories |
 | `12-locale.sh` | Setup Locales and keyboard settings |
 | `13-kernel.sh` | Build and install RPi2/3 Kernel |
+| `14-rpi-config.sh` | Setup RPi2/3 config and cmdline |
 | `20-networking.sh` | Setup Networking |
 | `21-firewall.sh` | Setup Firewall |
 | `30-security.sh` | Setup Users and Security settings |
 | `31-logging.sh` | Setup Logging |
+| `32-sshd.sh` | Setup SSH and public keys |
 | `41-uboot.sh` | Build and Setup U-Boot |
 | `42-fbturbo.sh` | Build and Setup fbturbo Xorg driver |
 | `50-firstboot.sh` | First boot actions |
@@ -303,6 +371,7 @@ All the required configuration files that will be copied to the generated OS ima
 | `sysctl.d` | Swapping and Network Hardening configuration |
 | `xorg` | fbturbo Xorg driver configuration |
 
+## Custom packages and scripts
 Debian custom packages, i.e. those not in the debian repositories, can be installed by placing them in the `packages` directory. They are installed immediately after packages from the repositories are installed. Any dependencies listed in the custom packages will be downloaded automatically from the repositories. Do not list these custom packages in `APT_INCLUDES`.
 
 Scripts in the custom.d directory will be executed after all other installation is complete but before the image is created.
@@ -319,18 +388,19 @@ After the image file was successfully created by the `rpi23-gen-image.sh` script
 
 #####Flashing examples:
 ```shell
-bmaptool copy ./images/jessie/2015-12-13-debian-jessie.img /dev/mmcblk0
-dd bs=4M if=./images/jessie/2015-12-13-debian-jessie.img of=/dev/mmcblk0
+bmaptool copy ./images/jessie/2017-01-23-rpi3-jessie.img /dev/mmcblk0
+dd bs=4M if=./images/jessie/2017-01-23-rpi3-jessie.img of=/dev/mmcblk0
 ```
 If you have set `ENABLE_SPLITFS`, copy the `-frmw` image on the microSD card, then the `-root` one on the USB drive:
 ```shell
-bmaptool copy ./images/jessie/2015-12-13-debian-jessie-frmw.img /dev/mmcblk0
-bmaptool copy ./images/jessie/2015-12-13-debian-jessie-root.img /dev/sdc
+bmaptool copy ./images/jessie/2017-01-23-rpi3-jessie-frmw.img /dev/mmcblk0
+bmaptool copy ./images/jessie/2017-01-23-rpi3-jessie-root.img /dev/sdc
 ```
 
 ## External links and references
 * [Debian worldwide mirror sites](https://www.debian.org/mirror/list)
 * [Debian Raspberry Pi 2 Wiki](https://wiki.debian.org/RaspberryPi2)
+* [Debian CrossToolchains Wiki](https://wiki.debian.org/CrossToolchains)
 * [Official Raspberry Pi Firmware on github](https://github.com/raspberrypi/firmware)
 * [Official Raspberry Pi Kernel on github](https://github.com/raspberrypi/linux)
 * [U-BOOT git repository](http://git.denx.de/?p=u-boot.git;a=summary)
