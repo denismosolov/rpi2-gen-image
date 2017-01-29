@@ -72,8 +72,7 @@ CHROOT_SOURCE=${CHROOT_SOURCE:=""}
 
 # Prepare date string for default image file name
 DATE="$(date +%Y-%m-%d)"
-# Image file name
-IMAGE_NAME=${IMAGE_NAME:="$BASEDIR/$DATE-debian-$RELEASE"}
+IMAGE_NAME=${IMAGE_NAME:=${BASEDIR}/${DATE}-rpi${RPI_MODEL}-${RELEASE}}
 
 # Chroot directories
 R="${BUILDDIR}/chroot"
@@ -146,6 +145,7 @@ SSH_USER_PUB_KEY=${SSH_USER_PUB_KEY:=""}
 ENABLE_MINBASE=${ENABLE_MINBASE:=false}
 ENABLE_REDUCE=${ENABLE_REDUCE:=false}
 ENABLE_UBOOT=${ENABLE_UBOOT:=false}
+UBOOTSRC_DIR=${UBOOTSRC_DIR:=""}
 ENABLE_FBTURBO=${ENABLE_FBTURBO:=false}
 ENABLE_HARDNET=${ENABLE_HARDNET:=false}
 ENABLE_IPTABLES=${ENABLE_IPTABLES:=false}
@@ -232,7 +232,7 @@ fi
 if [ "$RELEASE" = "jessie" ] ; then
   COMPILER_PACKAGES="linux-compiler-gcc-4.8-arm g++ make bc"
 elif [ "$RELEASE" = "stretch" ] ; then
-  COMPILER_PACKAGES="linux-compiler-gcc-5-arm g++ make bc"
+  COMPILER_PACKAGES="g++ make bc"
   BUILD_KERNEL=true
 else
   echo "error: Debian release ${RELEASE} is not supported!"
@@ -241,7 +241,7 @@ fi
 
 # Add packages required for kernel cross compilation
 if [ "$BUILD_KERNEL" = true ] ; then
-  REQUIRED_PACKAGES="${REQUIRED_PACKAGES} gcc-arm-linux-gnueabihf"
+  REQUIRED_PACKAGES="${REQUIRED_PACKAGES} crossbuild-essential-armhf"
 fi
 
 # Add libncurses5 to enable kernel menuconfig
@@ -327,6 +327,12 @@ fi
 # Check if specified KERNELSRC_DIR directory exists
 if [ -n "$KERNELSRC_DIR" ] && [ ! -d "$KERNELSRC_DIR" ] ; then
   echo "error: '${KERNELSRC_DIR}' specified directory not found (KERNELSRC_DIR)!"
+  exit 1
+fi
+
+# Check if specified UBOOTSRC_DIR directory exists
+if [ -n "$UBOOTSRC_DIR" ] && [ ! -d "$UBOOTSRC_DIR" ] ; then
+  echo "error: '${UBOOTSRC_DIR}' specified directory not found (UBOOTSRC_DIR)!"
   exit 1
 fi
 
@@ -523,42 +529,39 @@ ROOT_SECTORS=$(expr $(expr ${CHROOT_SIZE} + ${CHROOT_SIZE} \/ 100 \* 25) \* 1024
 # Calculate required image size in 512 Byte sectors
 IMAGE_SECTORS=$(expr ${TABLE_SECTORS} + ${FRMW_SECTORS} + ${ROOT_SECTORS})
 
-# Prepare date string for image file name
-DATE="$(date +%Y-%m-%d)"
-
 # Prepare image file
 if [ "$ENABLE_SPLITFS" = true ] ; then
-  dd if=/dev/zero of="${IMAGE_NAME}-frmw.img" bs=512 count=${TABLE_SECTORS}
-  dd if=/dev/zero of="${IMAGE_NAME}-frmw.img" bs=512 count=0 seek=${FRMW_SECTORS}
-  dd if=/dev/zero of="${IMAGE_NAME}-root.img" bs=512 count=${TABLE_SECTORS}
-  dd if=/dev/zero of="${IMAGE_NAME}-root.img" bs=512 count=0 seek=${ROOT_SECTORS}
+  dd if=/dev/zero of="$IMAGE_NAME-frmw.img" bs=512 count=${TABLE_SECTORS}
+  dd if=/dev/zero of="$IMAGE_NAME-frmw.img" bs=512 count=0 seek=${FRMW_SECTORS}
+  dd if=/dev/zero of="$IMAGE_NAME-root.img" bs=512 count=${TABLE_SECTORS}
+  dd if=/dev/zero of="$IMAGE_NAME-root.img" bs=512 count=0 seek=${ROOT_SECTORS}
 
   # Write firmware/boot partition tables
-  sfdisk -q -L -uS -f "${IMAGE_NAME}-frmw.img" 2> /dev/null <<EOM
+  sfdisk -q -L -uS -f "$IMAGE_NAME-frmw.img" 2> /dev/null <<EOM
 ${TABLE_SECTORS},${FRMW_SECTORS},c,*
 EOM
 
   # Write root partition table
-  sfdisk -q -L -uS -f "${IMAGE_NAME}-root.img" 2> /dev/null <<EOM
+  sfdisk -q -L -uS -f "$IMAGE_NAME-root.img" 2> /dev/null <<EOM
 ${TABLE_SECTORS},${ROOT_SECTORS},83
 EOM
 
   # Setup temporary loop devices
-  FRMW_LOOP="$(losetup -o 1M --sizelimit 64M -f --show ${IMAGE_NAME}-frmw.img)"
-  ROOT_LOOP="$(losetup -o 1M -f --show ${IMAGE_NAME}-root.img)"
+  FRMW_LOOP="$(losetup -o 1M --sizelimit 64M -f --show $IMAGE_NAME-frmw.img)"
+  ROOT_LOOP="$(losetup -o 1M -f --show $IMAGE_NAME-root.img)"
 else # ENABLE_SPLITFS=false
-  dd if=/dev/zero of="${IMAGE_NAME}.img" bs=512 count=${TABLE_SECTORS}
-  dd if=/dev/zero of="${IMAGE_NAME}.img" bs=512 count=0 seek=${IMAGE_SECTORS}
+  dd if=/dev/zero of="$IMAGE_NAME.img" bs=512 count=${TABLE_SECTORS}
+  dd if=/dev/zero of="$IMAGE_NAME.img" bs=512 count=0 seek=${IMAGE_SECTORS}
 
   # Write partition table
-  sfdisk -q -L -uS -f "${IMAGE_NAME}.img" 2> /dev/null <<EOM
+  sfdisk -q -L -uS -f "$IMAGE_NAME.img" 2> /dev/null <<EOM
 ${TABLE_SECTORS},${FRMW_SECTORS},c,*
 ${ROOT_OFFSET},${ROOT_SECTORS},83
 EOM
 
   # Setup temporary loop devices
-  FRMW_LOOP="$(losetup -o 1M --sizelimit 64M -f --show ${IMAGE_NAME}.img)"
-  ROOT_LOOP="$(losetup -o 65M -f --show ${IMAGE_NAME}.img)"
+  FRMW_LOOP="$(losetup -o 1M --sizelimit 64M -f --show $IMAGE_NAME.img)"
+  ROOT_LOOP="$(losetup -o 65M -f --show $IMAGE_NAME.img)"
 fi
 
 if [ "$ENABLE_CRYPTFS" = true ] ; then
@@ -605,16 +608,16 @@ cleanup
 # Create block map file(s) of image(s)
 if [ "$ENABLE_SPLITFS" = true ] ; then
   # Create block map files for "bmaptool"
-  bmaptool create -o "${IMAGE_NAME}-frmw.bmap" "${IMAGE_NAME}-frmw.img"
-  bmaptool create -o "${IMAGE_NAME}-root.bmap" "${IMAGE_NAME}-root.img"
+  bmaptool create -o "$IMAGE_NAME-frmw.bmap" "$IMAGE_NAME-frmw.img"
+  bmaptool create -o "$IMAGE_NAME-root.bmap" "$IMAGE_NAME-root.img"
 
   # Image was successfully created
-  echo "${IMAGE_NAME}-frmw.img ($(expr \( ${TABLE_SECTORS} + ${FRMW_SECTORS} \) \* 512 \/ 1024 \/ 1024)M)" ": successfully created"
-  echo "${IMAGE_NAME}-root.img ($(expr \( ${TABLE_SECTORS} + ${ROOT_SECTORS} \) \* 512 \/ 1024 \/ 1024)M)" ": successfully created"
+  echo "$IMAGE_NAME-frmw.img ($(expr \( ${TABLE_SECTORS} + ${FRMW_SECTORS} \) \* 512 \/ 1024 \/ 1024)M)" ": successfully created"
+  echo "$IMAGE_NAME-root.img ($(expr \( ${TABLE_SECTORS} + ${ROOT_SECTORS} \) \* 512 \/ 1024 \/ 1024)M)" ": successfully created"
 else
   # Create block map file for "bmaptool"
-  bmaptool create -o "${IMAGE_NAME}.bmap" "${IMAGE_NAME}.img"
+  bmaptool create -o "$IMAGE_NAME.bmap" "$IMAGE_NAME.img"
 
   # Image was successfully created
-  echo "${IMAGE_NAME}.img ($(expr \( ${TABLE_SECTORS} + ${FRMW_SECTORS} + ${ROOT_SECTORS} \) \* 512 \/ 1024 \/ 1024)M)" ": successfully created"
+  echo "$IMAGE_NAME.img ($(expr \( ${TABLE_SECTORS} + ${FRMW_SECTORS} + ${ROOT_SECTORS} \) \* 512 \/ 1024 \/ 1024)M)" ": successfully created"
 fi

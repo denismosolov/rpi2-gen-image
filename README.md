@@ -196,6 +196,9 @@ Reduce the disk space usage by deleting packages and files. See `REDUCE_*` param
 ##### `ENABLE_UBOOT`=false
 Replace the default RPi2/3 second stage bootloader (bootcode.bin) with [U-Boot bootloader](http://git.denx.de/?p=u-boot.git;a=summary). U-Boot can boot images via the network using the BOOTP/TFTP protocol.
 
+##### `UBOOTSRC_DIR`=""
+Path to a directory of [U-Boot bootloader sources](http://git.denx.de/?p=u-boot.git;a=summary) that will be copied, configured, build and installed inside the chroot.
+
 ##### `ENABLE_FBTURBO`=false
 Install and enable the [hardware accelerated Xorg video driver](https://github.com/ssvb/xf86-video-fbturbo) `fbturbo`. Please note that this driver is currently limited to hardware accelerated window moving and scrolling.
 
@@ -333,6 +336,15 @@ Set cipher specification string. `aes-xts*` ciphers are strongly recommended.
 ##### `CRYPTFS_XTSKEYSIZE`=512
 Sets key size in bits. The argument has to be a multiple of 8.
 
+---
+
+#### Build settings:
+##### `BASEDIR`=$(pwd)/images/${RELEASE}
+Set a path to a working directory used by the script to generate an image.
+
+##### `IMAGE_NAME`=${BASEDIR}/${DATE}-rpi${RPI_MODEL}-${RELEASE}
+Set a filename for the output file(s). Note: the script will create $IMAGE_NAME.img if `ENABLE_SPLITFS`=false or $IMAGE_NAME-frmw.img and $IMAGE_NAME-root.img if `ENABLE_SPLITFS`=true.
+
 ## Understanding the script
 The functions of this script that are required for the different stages of the bootstrapping are split up into single files located inside the `bootstrap.d` directory. During the bootstrapping every script in this directory gets executed in lexicographical order:
 
@@ -342,7 +354,8 @@ The functions of this script that are required for the different stages of the b
 | `11-apt.sh` | Setup APT repositories |
 | `12-locale.sh` | Setup Locales and keyboard settings |
 | `13-kernel.sh` | Build and install RPi2/3 Kernel |
-| `14-rpi-config.sh` | Setup RPi2/3 config and cmdline |
+| `14-fstab.sh` | Setup fstab and initramfs |
+| `15-rpi-config.sh` | Setup RPi2/3 config and cmdline |
 | `20-networking.sh` | Setup Networking |
 | `21-firewall.sh` | Setup Firewall |
 | `30-security.sh` | Setup Users and Security settings |
