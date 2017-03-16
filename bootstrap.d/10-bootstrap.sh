@@ -37,16 +37,15 @@ if [ "$CHROOT_SOURCE" = "" ] ; then
 
   # Complete the bootstrapping process
   chroot_exec /debootstrap/debootstrap --second-stage
+
+  mount_required_fs
 else
   cp -r "$CHROOT_SOURCE"/* "${R}"/
   chroot "${R}" bash -c 'echo nameserver 8.8.4.4 > /etc/resolv.conf'
   chroot "${R}"/ apt-get update
+  mount_required_fs
   chroot "${R}"/ apt-get install -y `echo $APT_INCLUDES | sed 's/,/ /g'`
 fi
-
-# Mount required filesystems
-mount -t proc none "${R}/proc"
-mount -t sysfs none "${R}/sys"
 
 # Mount pseudo terminal slave if supported by Debian release
 if [ -d "${R}/dev/pts" ] ; then
