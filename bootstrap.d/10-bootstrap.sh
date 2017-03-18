@@ -41,6 +41,7 @@ if [ "$CHROOT_SOURCE" = "" ] ; then
   mount_required_fs
 else
   cp -r "$CHROOT_SOURCE"/* "${R}"/
+  chroot "${R}" bash -c 'echo nameserver 8.8.4.4 > /etc/resolv.conf'
   chroot "${R}"/ apt-get update
   mount_required_fs
   chroot "${R}"/ apt-get install -y `echo $APT_INCLUDES | sed 's/,/ /g'`
