@@ -68,6 +68,7 @@ UBOOT_URL=${UBOOT_URL:=git://git.denx.de/u-boot.git}
 # Build directories
 BASEDIR=${BASEDIR:=$(pwd)/images/${RELEASE}}
 BUILDDIR="${BASEDIR}/build"
+CHROOT_SOURCE=${CHROOT_SOURCE:=""}
 # Prepare date string for default image file name
 DATE="$(date +%Y-%m-%d)"
 IMAGE_NAME=${IMAGE_NAME:=${BASEDIR}/${DATE}-rpi${RPI_MODEL}-${RELEASE}}

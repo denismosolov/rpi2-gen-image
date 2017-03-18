@@ -1,5 +1,10 @@
 # This file contains utility functions used by rpi23-gen-image.sh
 
+mount_required_fs() {
+  mount -t proc none "${R}/proc"
+  mount -t sysfs none "${R}/sys"
+}
+
 cleanup (){
   set +x
   set +e
